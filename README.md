@@ -7,3 +7,5 @@
 <p>Compound, 2021 mainly Ethereum</p>
 
 <p>memo for yield-farming, code for frontend is there, no video yet seems like.</p>
+
+<p>Frontend later</p>
