@@ -1,79 +1,82 @@
 pragma solidity ^0.7.3;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./Compound.sol";
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import './Compound.sol';
 
 contract Wallet is Compound {
-    address public admin;
+  address public admin;
 
-    constructor(
-        address _comptroller,
-        address _cEthAddress
-    ) Compound(_comptroller, _cEthAddress) {
-        admin = msg.sender;
-    }
+  constructor(
+    address _comptroller, 
+    address _cEthAddress
+  ) Compound(_comptroller, _cEthAddress) {
+    admin = msg.sender;
+  }
 
-    function deposit(
-        address cTokenAddress,
-        uint underlyingAmount
-    ) external {
-        address underlyingAddress = getUnderlyingAddress(cTokenAddress);
-        IERC20(underlyingAddress).transferFrom(msg.sender, address(this), underlyingAmount);
-        supply(cTokenAddress, underlyingAmount);
-    }
+  function deposit(
+    address cTokenAddress, 
+    uint underlyingAmount
+  ) 
+    onlyAdmin()
+    external 
+  {
+    address underlyingAddress = getUnderlyingAddress(cTokenAddress);
+    IERC20(underlyingAddress).transferFrom(msg.sender, address(this), underlyingAmount);
+    supply(cTokenAddress, underlyingAmount);
+  }
 
-    function withdraw(
-        address cTokenAddress,
-        uint underlyingAmount,
-        address recipient
-    )
-        onlyAdmin()
-        external
-        {
-            require(getUnderlyingBalance(cTokenAddress) => underlyingAmount,
-            "balance too low"
-            );
-            claimComp();
-            redeem(cTokenAddress, underlyingAmount);
+  function withdraw(
+    address cTokenAddress, 
+    uint underlyingAmount,
+    address recipient
+  ) 
+    onlyAdmin()
+    external  
+  {
+    require(
+      getUnderlyingBalance(cTokenAddress) >= underlyingAmount, 
+      'balance too low'
+    );
+    claimComp();
+    redeem(cTokenAddress, underlyingAmount);
 
-            address underlyingAddress = getUnderlyingAddress(cTokenAddress);
-            IERC20(underlyingToken).transfer(recipient, underlyingAmount);
+    address underlyingAddress = getUnderlyingAddress(cTokenAddress); 
+    IERC20(underlyingAddress).transfer(recipient, underlyingAmount);
 
-            address compAddress = getCompAddress();
-            IERC20 compToken = IERC20(compAddress);
-            uint compAmoount = compToken.balanceOf(address(this));
-            compToken.transfer(recipient, compAmount);
-        }
+    address compAddress = getCompAddress(); 
+    IERC20 compToken = IERC20(compAddress);
+    uint compAmount = compToken.balanceOf(address(this));
+    compToken.transfer(recipient, compAmount);
+  }
 
-    receive() external payable {
-        supplyEth(msg.sender);
-    }
+  function withdrawEth(
+    uint underlyingAmount,
+    address payable recipient
+  ) 
+    onlyAdmin()
+    external  
+  {
+    require(
+      getUnderlyingEthBalance() >= underlyingAmount, 
+      'balance too low'
+    );
+    claimComp();
+    redeemEth(underlyingAmount);
 
-    function withdrawEth(
-        uint underlyingAmount,
-        address payable recipient
-    )
-        onlyAdmin
-        external
-        {
-        require(getUnderlyingEthBalance() => underlyingAmount,
-            "balance too low"
-            );
-            claimComp();
-            redeemEth(underlyingAmount);
+    recipient.transfer(underlyingAmount);
 
-            recipient.transfer(underlyingAmount);
-            
-            address compAddress = getCompAddress();
-            IERC20 compToken = IERC20(compAddress);
-            uint compAmoount = compToken.balanceOf(address(this));
-            compToken.transfer(recipient, compAmount);
-        }
+    address compAddress = getCompAddress(); 
+    IERC20 compToken = IERC20(compAddress);
+    uint compAmount = compToken.balanceOf(address(this));
+    compToken.transfer(recipient, compAmount);
+  }
 
-    modifier onlyAdmin {
-        require(msg.sender == admin, "only admin");
-        //Underscore is for execution
-        _;
-    }
+  receive() external payable {
+    supplyEth(msg.value);
+  }
 
-//Need to work on indentations, cleaner code.
+  modifier onlyAdmin() {
+    require(msg.sender == admin, 'only admin');
+    _;
+  }
+}
