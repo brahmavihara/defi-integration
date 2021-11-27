@@ -1,16 +1,20 @@
-pragma solidity ^0.5.7;
+pragma solidity ^0.7.3;
 
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import './CTokenInterface.sol';
+import './CEthInterface.sol';
 import './ComptrollerInterface.sol';
 
 contract Compound {
   ComptrollerInterface public comptroller;
+  CEthInterface public cEth;
 
   constructor(
-    address _comptroller
-  ) public {
+    address _comptroller,
+    address _cEthAddress
+  ) {
     comptroller = ComptrollerInterface(_comptroller);
+    cEth = CEthInterface(_cEthAddress);
   }
 
   function supply(address cTokenAddress, uint underlyingAmount) internal {
@@ -24,43 +28,25 @@ contract Compound {
     );
   }
 
-  function redeem(address cTokenAddress, uint cTokenAmount) internal {
+  function supplyEth(uint underlyingAmount) internal {
+    cEth.mint{value: underlyingAmount}();
+  }
+
+  function redeem(address cTokenAddress, uint underlyingAmount) internal {
     CTokenInterface cToken = CTokenInterface(cTokenAddress);
-    uint result = cToken.redeem(cTokenAmount);
+    uint result = cToken.redeemUnderlying(underlyingAmount);
     require(
       result == 0,
-      'cToken#redeem() failed. see Compound ErrorReporter.sol for more details'
+      'cToken#redeemUnderlying() failed. see Compound ErrorReporter.sol for more details'
     );
   }
 
-  function enterMarket(address cTokenAddress) internal {
-    address[] memory markets = new address[](1);
-    markets[0] = cTokenAddress; 
-    uint[] memory results = comptroller.enterMarkets(markets);
+  function redeemEth(uint underlyingAmount) internal {
+    uint result = cEth.redeemUnderlying(underlyingAmount);
     require(
-      results[0] == 0, 
-      'comptroller#enterMarket() failed. see Compound ErrorReporter.sol for details'
-    ); 
-  }
-
-  function borrow(address cTokenAddress, uint borrowAmount) internal {
-    CTokenInterface cToken = CTokenInterface(cTokenAddress);
-    uint result = cToken.borrow(borrowAmount);
-    require(
-      result == 0, 
-      'cToken#borrow() failed. see Compound ErrorReporter.sol for details'
-    ); 
-  }
-
-  function repayBorrow(address cTokenAddress, uint underlyingAmount) internal {
-    CTokenInterface cToken = CTokenInterface(cTokenAddress);
-    address underlyingAddress = cToken.underlying(); 
-    IERC20(underlyingAddress).approve(cTokenAddress, underlyingAmount);
-    uint result = cToken.repayBorrow(underlyingAmount);
-    require(
-      result == 0, 
-      'cToken#borrow() failed. see Compound ErrorReporter.sol for details'
-    ); 
+      result == 0,
+      'cEth#redeemUnderlying() failed. see Compound ErrorReporter.sol for more details'
+    );
   }
 
   function claimComp() internal {
@@ -71,12 +57,25 @@ contract Compound {
     return comptroller.getCompAddress();
   }
 
+  function getUnderlyingAddress(
+    address cTokenAddress
+  ) 
+    internal 
+    view 
+    returns(address) 
+  {
+    return CTokenInterface(cTokenAddress).underlying();
+  }
+
   function getcTokenBalance(address cTokenAddress) public view returns(uint){
     return CTokenInterface(cTokenAddress).balanceOf(address(this));
   }
 
-  //No view keyword because borrowBalanceCurrent() can be called in a tx, and Solidity complains if view
-  function getBorrowBalance(address cTokenAddress) public returns(uint){
-    return CTokenInterface(cTokenAddress).borrowBalanceCurrent(address(this));
+  function getUnderlyingBalance(address cTokenAddress) public returns(uint){
+    return CTokenInterface(cTokenAddress).balanceOfUnderlying(address(this));
+  }
+
+  function getUnderlyingEthBalance() public returns(uint){
+    return cEth.balanceOfUnderlying(address(this));
   }
 }
